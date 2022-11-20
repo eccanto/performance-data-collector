@@ -2,4 +2,6 @@
 
 set -euo pipefail
 
-bash data_collectors/scripts/code_checkers.sh
+pushd data_collectors/
+    bash scripts/code_checkers.sh
+popd
