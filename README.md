@@ -125,7 +125,9 @@ Tools used:
 ## Run manually
 
 ```bash
-bash data_collectors/scripts/code_checkers.sh
+cd data_collectors
+bash scripts/code_checkers.sh
+cd -
 ```
 
 # License
