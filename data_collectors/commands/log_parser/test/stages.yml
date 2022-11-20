@@ -1,0 +1,18 @@
+date_pattern: "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d+).*"
+
+first: ".* starting iteration .*"
+end: &end_pattern ".* iteration \".+\" finished."
+
+stages:
+  - id: stage_1
+    pattern: ".* stage 1"
+  - id: stage_2
+    pattern: ".* stage 2 - message 1"
+  - id: stage_3
+    pattern: ".* stage 3 - message 2"
+  - id: stage_4
+    pattern: ".* stage 4"
+  - id: fail_1
+    pattern: ".* fail detected."
+  - id: finish
+    pattern: *end_pattern

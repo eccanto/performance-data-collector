@@ -1,0 +1,35 @@
+version: '3.9'
+services:
+  elasticsearch:
+    image: elasticsearch:8.5.1
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - ELASTIC_USERNAME=admin
+      - ELASTIC_PASSWORD=admin
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+      - 9300:9300
+
+  kibana:
+    image: kibana:7.17.7
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_URL: "http://elasticsearch:9200"
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+      XPACK_MONITORING_ENABLED: "true"
+      XPACK_MONITORING_COLLECTION_ENABLED: "true"
+      XPACK_SECURITY_ENABLED: "false"
+      ELASTICSEARCH_USERNAME: "admin"
+      ELASTICSEARCH_PASSWORD: "admin"
+    ports:
+      - 5601:5601
