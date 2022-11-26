@@ -6,7 +6,7 @@ import logging
 import subprocess  # nosec B404
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydoc import locate
 
 import click
@@ -43,7 +43,7 @@ def _get_system_data():
     memory_info = psutil.virtual_memory()
     system_data['memory']['total'] = memory_info.total
     system_data['memory']['available'] = memory_info.available
-    system_data['memory']['percent'] = memory_info.percent
+    system_data['memory']['percent'] = memory_info.percent / 100
     system_data['memory']['used'] = memory_info.used
     system_data['memory']['free'] = memory_info.free
     system_data['memory']['active'] = memory_info.active
@@ -54,7 +54,7 @@ def _get_system_data():
     system_data['memory']['slab'] = memory_info.slab
 
     cpu_times = psutil.cpu_times()
-    system_data['cpu']['percent'] = psutil.cpu_percent()
+    system_data['cpu']['percent'] = psutil.cpu_percent() / 100
     system_data['cpu']['user'] = cpu_times.user
     system_data['cpu']['system'] = cpu_times.system
     system_data['cpu']['idle'] = cpu_times.idle
@@ -85,7 +85,7 @@ def _get_processes_data(processses):
         cpu_times = process.cpu_times()
         processses_data[process.name()]['cpu']['user_time'] = cpu_times.user
         processses_data[process.name()]['cpu']['system_time'] = cpu_times.system
-        processses_data[process.name()]['cpu']['cpu_percent'] = process.cpu_percent()
+        processses_data[process.name()]['cpu']['cpu_percent'] = process.cpu_percent() / 100
 
         io_counters = process.io_counters()
         processses_data[process.name()]['io']['read_count'] = io_counters.read_count
@@ -142,6 +142,7 @@ def processes_data_command(context, interval, processes, commands):
 
     elasticsearch_index = context.obj['elasticsearch_index']
     elasticsearch_client = context.obj['elasticsearch_client']
+    delta_time = context.obj['delta_time']
 
     commands = [json.loads(command) for command in commands]
     processes_objects = _get_psutil_processes(processes)
@@ -151,7 +152,10 @@ def processes_data_command(context, interval, processes, commands):
         for iteration in itertools.count(1):
             iteration_data = defaultdict(lambda: defaultdict(lambda: {}))
 
-            iteration_data['@timestamp'] = datetime.utcnow().isoformat()
+            now = datetime.utcnow()
+            iteration_data['@timestamp'] = (now + timedelta(hours=delta_time)).isoformat()
+            iteration_data['@real_timestamp'] = now.isoformat()
+
             iteration_data['system'] = _get_system_data()
             iteration_data['processes'] = _get_processes_data(processes_objects)
 
