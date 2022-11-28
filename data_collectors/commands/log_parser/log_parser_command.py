@@ -35,6 +35,10 @@ class LogLine:
 
 def follow_file(path):
     """Generator function that yields new lines in a file."""
+    while not path.exists():
+        logging.info('waiting log file: %s...', path)
+        time.sleep(1)
+
     with open(path, encoding='UTF-8') as file_object:
         while True:
             line = file_object.readline().strip()
@@ -79,7 +83,7 @@ def _process_block(block, stages_data, delta_time):
 
 
 @click.command('Collect log file data by messages.')
-@click.option('-l', '--log_file', help='Log file path', type=click.Path(exists=True, path_type=Path), required=True)
+@click.option('-l', '--log_file', help='Log file path', type=click.Path(path_type=Path), required=True)
 @click.option('-s', '--stage_file', help='Stage file path', type=click.Path(exists=True, path_type=Path), required=True)
 @click.pass_context
 def log_parser_command(context, log_file, stage_file):

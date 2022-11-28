@@ -22,13 +22,11 @@ _SAMPLE_SIZE = 20
 def _get_psutil_processes(process_names):
     processes_objects = []
     for process_name in process_names:
-        while not (
-            process := next((process for process in psutil.process_iter() if process.name() == process_name), None)
-        ):
+        while not (processes := [process for process in psutil.process_iter() if process.name() == process_name]):
             logging.info('waiting process: %s...', process_name)
             time.sleep(1)
 
-        processes_objects.append(process)
+        processes_objects.extend(processes)
     return processes_objects
 
 
@@ -77,21 +75,26 @@ def _get_system_data():
 def _get_processes_data(processses):
     processses_data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
     for process in processses:
+        process_label = f'{process.name()} - {process.pid}'
+
+        processses_data[process_label]['name'] = process.name()
+        processses_data[process_label]['command_line'] = ' '.join(process.cmdline())
+
         memory_info = process.memory_full_info()
-        processses_data[process.name()]['memory']['rss'] = memory_info.rss
-        processses_data[process.name()]['memory']['vms'] = memory_info.vms
-        processses_data[process.name()]['memory']['shared'] = memory_info.shared
+        processses_data[process_label]['memory']['rss'] = memory_info.rss
+        processses_data[process_label]['memory']['vms'] = memory_info.vms
+        processses_data[process_label]['memory']['shared'] = memory_info.shared
 
         cpu_times = process.cpu_times()
-        processses_data[process.name()]['cpu']['user_time'] = cpu_times.user
-        processses_data[process.name()]['cpu']['system_time'] = cpu_times.system
-        processses_data[process.name()]['cpu']['cpu_percent'] = process.cpu_percent() / 100
+        processses_data[process_label]['cpu']['user_time'] = cpu_times.user
+        processses_data[process_label]['cpu']['system_time'] = cpu_times.system
+        processses_data[process_label]['cpu']['cpu_percent'] = process.cpu_percent() / 100
 
         io_counters = process.io_counters()
-        processses_data[process.name()]['io']['read_count'] = io_counters.read_count
-        processses_data[process.name()]['io']['write_count'] = io_counters.write_count
-        processses_data[process.name()]['io']['read_bytes'] = io_counters.read_bytes
-        processses_data[process.name()]['io']['write_bytes'] = io_counters.write_bytes
+        processses_data[process_label]['io']['read_count'] = io_counters.read_count
+        processses_data[process_label]['io']['write_count'] = io_counters.write_count
+        processses_data[process_label]['io']['read_bytes'] = io_counters.read_bytes
+        processses_data[process_label]['io']['write_bytes'] = io_counters.write_bytes
 
     return processses_data
 
@@ -145,7 +148,6 @@ def processes_data_command(context, interval, processes, commands):
     delta_time = context.obj['delta_time']
 
     commands = [json.loads(command) for command in commands]
-    processes_objects = _get_psutil_processes(processes)
 
     data = []
     try:
@@ -157,7 +159,7 @@ def processes_data_command(context, interval, processes, commands):
             iteration_data['@real_timestamp'] = now.isoformat()
 
             iteration_data['system'] = _get_system_data()
-            iteration_data['processes'] = _get_processes_data(processes_objects)
+            iteration_data['processes'] = _get_processes_data(_get_psutil_processes(processes))
 
             for command in commands:
                 iteration_data['custom'][command['name']] = locate(command['type'])(_run_command(command['command']))
