@@ -4,12 +4,14 @@ import logging
 import re
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
+from pydoc import locate
 
 import click
 import coloredlogs
 import yaml
+from dateutil.parser import parse
 
 
 class LogLine:
@@ -22,7 +24,7 @@ class LogLine:
         self.line = line.strip()
 
         self.date_string = re.match(date_format, line).group(1)
-        self.date = datetime.strptime(self.date_string, self._DATE_FORMAT)
+        self.date = parse(self.date_string)
 
     def __repr__(self):
         """Object instance representation."""
@@ -56,28 +58,41 @@ def _process_block(block, stages_data, delta_time):
     data['@timestamp'] = block[0].date.astimezone() + timedelta(hours=delta_time)
     data['@real_timestamp'] = block[0].date.astimezone()
 
-    begin_position, end_position = 0, len(block)
     for stage in stages_data['stages']:
         stage_block = []
-        begin_stage = end_stage = None
-        for index in range(begin_position, end_position):
-            sub_line = block[index]
-            if re.match(stage['begin'], sub_line.line):
-                begin_stage = sub_line
-                stage_block = [sub_line.line]
-            elif stage_block and re.match(stage['end'], sub_line.line):
-                end_stage = sub_line
-                stage_block.append(sub_line.line)
-                begin_position = index
+        for line in block:
+            if not stage_block and re.match(stage['begin'], line.line):
+                stage_block = [line]
+                if stage['begin'] == stage['end']:
+                    break
+            elif stage_block and re.match(stage['end'], line.line):
+                stage_block.append(line)
                 break
             elif stage_block:
-                stage_block.append(sub_line.line)
+                stage_block.append(line)
+        else:
+            logging.warning('Stage not found: "%s" (from "%s" to "%s")', stage['id'], block[0].date, block[-1].date)
+            continue
 
-        if (begin_stage is None) or (end_stage is None):
-            logging.warning('Stage not found: "%s" -> "%s"', stage['begin'], stage['end'])
+        data['stage'][stage['id']]['lines'] = [line.line for line in stage_block]
+        data['stage'][stage['id']]['duration'] = (stage_block[-1].date - stage_block[0].date).total_seconds()
 
-        data['stage'][stage['id']]['lines'] = stage_block
-        data['stage'][stage['id']]['duration'] = (end_stage.date - begin_stage.date).total_seconds()
+    for value in stages_data['values']:
+        for line in block:
+            match = re.match(value['pattern'], line.line)
+            if match:
+                try:
+                    data['value'][value['id']]['line'] = line.line
+                    data['value'][value['id']]['value'] = locate(value['type'])(match.group(1))
+                    break
+                except IndexError as error:
+                    logging.warning('Invalid value pattern group (%s): %s', value['pattern'], error)
+                except TypeError as error:
+                    logging.warning('Invalid value type (%s): %s', value['type'], error)
+                except ValueError as error:
+                    logging.warning('Unexpected cast (%s): %s', value['type'], error)
+        else:
+            logging.warning('Value not found: "%s" (from "%s" to "%s")', value['id'], block[0].date, block[-1].date)
 
     return data
 
@@ -108,9 +123,9 @@ def log_parser_command(context, log_file, stage_file):
     for line in follow_file(log_file):
         try:
             log_line = LogLine(line, stages_data['date_pattern'])
-            if re.match(stages_data['first'], log_line.line):
+            if re.match(stages_data['block']['begin'], log_line.line):
                 block = [log_line]
-            elif block and re.match(stages_data['end'], log_line.line):
+            elif block and re.match(stages_data['block']['end'], log_line.line):
                 block.append(log_line)
                 block.sort()
 

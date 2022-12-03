@@ -1,18 +1,35 @@
 date_pattern: "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d+).*"
 
-first: ".* starting iteration .*"
-end: &end_pattern ".* iteration \".+\" finished."
+block:
+  begin: ".* starting block \\d+"
+  end: ".* block finished"
 
 stages:
   - id: stage_1
-    pattern: ".* stage 1"
+    begin: ".* stage 1"
+    end: ".* end - stage 1"
+
   - id: stage_2
-    pattern: ".* stage 2 - message 1"
+    begin: ".* stage 2"
+    end: ".* end - stage 2"
+
   - id: stage_3
-    pattern: ".* stage 3 - message 2"
+    begin: ".* stage 3"
+    end: ".* end - stage 3"
+
   - id: stage_4
-    pattern: ".* stage 4"
+    begin: ".* stage 4"
+    end: ".* end - stage 4"
+
   - id: fail_1
-    pattern: ".* fail detected."
-  - id: finish
-    pattern: *end_pattern
+    begin: &fail_1_begin ".* fail-1 detected"
+    end: *fail_1_begin
+
+  - id: fail_2
+    begin: &fail_2_begin ".* fail-2 detected"
+    end: *fail_2_begin
+
+values:
+  - id: iteration
+    pattern: ".* starting block (\\d+)"
+    type: int

@@ -72,31 +72,29 @@ def _get_system_data():
     return system_data
 
 
-def _get_processes_data(processses):
-    processses_data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
-    for process in processses:
-        process_label = f'{process.name()} - {process.pid}'
-
-        processses_data[process_label]['name'] = process.name()
-        processses_data[process_label]['command_line'] = ' '.join(process.cmdline())
+def _get_processes_data(processes):
+    processes_data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
+    for process in processes:
+        processes_data[process.name()][process.pid]['name'] = process.name()
+        processes_data[process.name()][process.pid]['command_line'] = ' '.join(process.cmdline())
 
         memory_info = process.memory_full_info()
-        processses_data[process_label]['memory']['rss'] = memory_info.rss
-        processses_data[process_label]['memory']['vms'] = memory_info.vms
-        processses_data[process_label]['memory']['shared'] = memory_info.shared
+        processes_data[process.name()][process.pid]['memory']['rss'] = memory_info.rss
+        processes_data[process.name()][process.pid]['memory']['vms'] = memory_info.vms
+        processes_data[process.name()][process.pid]['memory']['shared'] = memory_info.shared
 
         cpu_times = process.cpu_times()
-        processses_data[process_label]['cpu']['user_time'] = cpu_times.user
-        processses_data[process_label]['cpu']['system_time'] = cpu_times.system
-        processses_data[process_label]['cpu']['cpu_percent'] = process.cpu_percent() / 100
+        processes_data[process.name()][process.pid]['cpu']['user_time'] = cpu_times.user
+        processes_data[process.name()][process.pid]['cpu']['system_time'] = cpu_times.system
+        processes_data[process.name()][process.pid]['cpu']['cpu_percent'] = process.cpu_percent() / 100
 
         io_counters = process.io_counters()
-        processses_data[process_label]['io']['read_count'] = io_counters.read_count
-        processses_data[process_label]['io']['write_count'] = io_counters.write_count
-        processses_data[process_label]['io']['read_bytes'] = io_counters.read_bytes
-        processses_data[process_label]['io']['write_bytes'] = io_counters.write_bytes
+        processes_data[process.name()][process.pid]['io']['read_count'] = io_counters.read_count
+        processes_data[process.name()][process.pid]['io']['write_count'] = io_counters.write_count
+        processes_data[process.name()][process.pid]['io']['read_bytes'] = io_counters.read_bytes
+        processes_data[process.name()][process.pid]['io']['write_bytes'] = io_counters.write_bytes
 
-    return processses_data
+    return processes_data
 
 
 @click.command('Collect machine performance data.')
