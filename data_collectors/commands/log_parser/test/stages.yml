@@ -4,32 +4,37 @@ block:
   begin: ".* starting block \\d+"
   end: ".* block finished"
 
-stages:
-  - id: stage_1
-    begin: ".* stage 1"
-    end: ".* end - stage 1"
+  stages:
+    - id: stage_1
+      begin: ".* stage 1"
+      end: ".* end - stage 1"
 
-  - id: stage_2
-    begin: ".* stage 2"
-    end: ".* end - stage 2"
+    - id: stage_2
+      begin: ".* stage 2"
+      end: ".* end - stage 2"
 
-  - id: stage_3
-    begin: ".* stage 3"
-    end: ".* end - stage 3"
+    - id: stage_3
+      begin: ".* stage 3"
+      end: ".* end - stage 3"
 
-  - id: stage_4
-    begin: ".* stage 4"
-    end: ".* end - stage 4"
+    - id: stage_4
+      begin: ".* stage 4"
+      end: ".* end - stage 4"
 
-  - id: fail_1
-    begin: &fail_1_begin ".* fail-1 detected"
-    end: *fail_1_begin
+    - id: fail_1
+      begin: &fail_1_begin ".* fail-1 detected"
+      end: *fail_1_begin
 
-  - id: fail_2
-    begin: &fail_2_begin ".* fail-2 detected"
-    end: *fail_2_begin
+    - id: fail_2
+      begin: &fail_2_begin ".* fail-2 detected"
+      end: *fail_2_begin
+
+  values:
+    - id: block_iteration
+      pattern: ".* starting block (\\d+)"
+      type: int
 
 values:
-  - id: iteration
+  - id: global_iteration
     pattern: ".* starting block (\\d+)"
     type: int

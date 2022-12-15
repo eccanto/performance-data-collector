@@ -51,9 +51,23 @@ def follow_file(path):
             yield line
 
 
-def _process_block(block, stages_data, delta_time):
+def _process_value(value_id, value_data, log_line, delta_time):
     data = defaultdict(lambda: defaultdict(lambda: {}))
+
+    data['@timestamp'] = log_line.date.astimezone() + timedelta(hours=delta_time)
+    data['@real_timestamp'] = log_line.date.astimezone()
+
+    data['value'][value_id]['line'] = log_line.line
+    data['value'][value_id]['value'] = value_data
+
+    return data
+
+
+def _process_block(block, stages_data, delta_time):
+    data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
     data['duration'] = (block[-1].date - block[0].date).total_seconds()
+
+    data['lines'] = [line.line for line in block]
 
     data['@timestamp'] = block[0].date.astimezone() + timedelta(hours=delta_time)
     data['@real_timestamp'] = block[0].date.astimezone()
@@ -82,8 +96,8 @@ def _process_block(block, stages_data, delta_time):
             match = re.match(value['pattern'], line.line)
             if match:
                 try:
-                    data['value'][value['id']]['line'] = line.line
-                    data['value'][value['id']]['value'] = locate(value['type'])(match.group(1))
+                    data['stage']['value'][value['id']]['line'] = line.line
+                    data['stage']['value'][value['id']]['value'] = locate(value['type'])(match.group(1))
                     break
                 except IndexError as error:
                     logging.warning('Invalid value pattern group (%s): %s', value['pattern'], error)
@@ -104,7 +118,7 @@ def _process_block(block, stages_data, delta_time):
 def log_parser_command(context, log_file, stage_file):
     """Collect log file data by messages.
 
-    :param contenxt: The Context object created by the click module which holds state for this particular invocation.
+    :param context: The Context object created by the click module which holds state for this particular invocation.
     """
     coloredlogs.install(
         fmt='%(asctime)s,%(msecs)03d %(hostname)s %(name)s[%(process)d] %(levelname)s %(message)s', level='INFO'
@@ -130,10 +144,21 @@ def log_parser_command(context, log_file, stage_file):
                 block.sort()
 
                 elasticsearch_client.index(
-                    index=elasticsearch_index, document=_process_block(block, stages_data, delta_time)
+                    index=elasticsearch_index, document=_process_block(block, stages_data['block'], delta_time)
                 )
+                block = []
             elif block:
                 block.append(log_line)
+
+            for value_pattern in stages_data['values']:
+                match = re.match(value_pattern['pattern'], log_line.line)
+                if match:
+                    elasticsearch_client.index(
+                        index=elasticsearch_index, document=_process_value(
+                            value_pattern['id'], locate(value_pattern['type'])(match.group(1)), log_line, delta_time
+                            )
+                    )
+
         except AttributeError:
             if line not in ignored_lines:
                 logging.warning('ignoring line: "%s"...', line)

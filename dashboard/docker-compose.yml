@@ -1,7 +1,7 @@
 version: '3.9'
 services:
   elasticsearch:
-    image: elasticsearch:8.5.1
+    image: elasticsearch:8.5.3
     container_name: elasticsearch
     restart: always
     environment:
@@ -11,6 +11,7 @@ services:
       - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ingest.geoip.downloader.enabled=false
     ulimits:
       memlock:
         soft: -1
@@ -24,12 +25,14 @@ services:
     container_name: kibana
     restart: unless-stopped
     environment:
-      ELASTICSEARCH_URL: "http://elasticsearch:9200"
-      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
-      XPACK_MONITORING_ENABLED: "true"
-      XPACK_MONITORING_COLLECTION_ENABLED: "true"
-      XPACK_SECURITY_ENABLED: "false"
-      ELASTICSEARCH_USERNAME: "admin"
-      ELASTICSEARCH_PASSWORD: "admin"
+      - ELASTICSEARCH_URL="http://elasticsearch:9200"
+      - ELASTICSEARCH_HOSTS="http://elasticsearch:9200"
+      - XPACK_MONITORING_ENABLED=true
+      - XPACK_MONITORING_COLLECTION_ENABLED=true
+      - XPACK_SECURITY_ENABLED=false
+      - ELASTICSEARCH_USERNAME=admin
+      - ELASTICSEARCH_PASSWORD=admin
     ports:
       - 5601:5601
+    depends_on:
+      - elasticsearch
