@@ -13,6 +13,11 @@ import coloredlogs
 import yaml
 from dateutil.parser import parse
 
+from commands.common import _check_collection
+
+
+ELASTICSEARCH_INDEX = 'log-data'
+
 
 class LogLine:
     """Log line parser."""
@@ -51,8 +56,9 @@ def follow_file(path):
             yield line
 
 
-def _process_value(value_id, value_data, log_line, delta_time):
+def _process_value(value_id, collection, value_data, log_line, delta_time):
     data = defaultdict(lambda: defaultdict(lambda: {}))
+    data['collection'] = collection
 
     data['@timestamp'] = log_line.date.astimezone() + timedelta(hours=delta_time)
     data['@real_timestamp'] = log_line.date.astimezone()
@@ -63,15 +69,7 @@ def _process_value(value_id, value_data, log_line, delta_time):
     return data
 
 
-def _process_block(block, stages_data, delta_time):
-    data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
-    data['duration'] = (block[-1].date - block[0].date).total_seconds()
-
-    data['lines'] = [line.line for line in block]
-
-    data['@timestamp'] = block[0].date.astimezone() + timedelta(hours=delta_time)
-    data['@real_timestamp'] = block[0].date.astimezone()
-
+def _process_stages_data(block, stages_data, data):
     for stage in stages_data['stages']:
         stage_block = []
         for line in block:
@@ -85,12 +83,14 @@ def _process_block(block, stages_data, delta_time):
             elif stage_block:
                 stage_block.append(line)
         else:
-            logging.warning('Stage not found: "%s" (from "%s" to "%s")', stage['id'], block[0].date, block[-1].date)
+            logging.debug('Stage not found: "%s" (from "%s" to "%s")', stage['id'], block[0].date, block[-1].date)
             continue
 
         data['stage'][stage['id']]['lines'] = [line.line for line in stage_block]
         data['stage'][stage['id']]['duration'] = (stage_block[-1].date - stage_block[0].date).total_seconds()
 
+
+def _process_values(block, stages_data, data):
     for value in stages_data['values']:
         for line in block:
             match = re.match(value['pattern'], line.line)
@@ -106,7 +106,22 @@ def _process_block(block, stages_data, delta_time):
                 except ValueError as error:
                     logging.warning('Unexpected cast (%s): %s', value['type'], error)
         else:
-            logging.warning('Value not found: "%s" (from "%s" to "%s")', value['id'], block[0].date, block[-1].date)
+            logging.debug('Value not found: "%s" (from "%s" to "%s")', value['id'], block[0].date, block[-1].date)
+
+
+def _process_block(block, collection, stages_data, delta_time):
+    data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {})))
+    data['collection'] = collection
+
+    data['duration'] = (block[-1].date - block[0].date).total_seconds()
+
+    data['lines'] = [line.line for line in block]
+
+    data['@timestamp'] = block[0].date.astimezone() + timedelta(hours=delta_time)
+    data['@real_timestamp'] = block[0].date.astimezone()
+
+    _process_stages_data(block, stages_data, data)
+    _process_values(block, stages_data, data)
 
     return data
 
@@ -124,11 +139,13 @@ def log_parser_command(context, log_file, stage_file):
         fmt='%(asctime)s,%(msecs)03d %(hostname)s %(name)s[%(process)d] %(levelname)s %(message)s', level='INFO'
     )
 
-    elasticsearch_index = context.obj['elasticsearch_index']
+    collection = context.obj['collection']
     elasticsearch_client = context.obj['elasticsearch_client']
     delta_time = context.obj['delta_time']
 
     logging.info('parsing log file: %s... (press Ctrl+C to stop)', log_file)
+
+    _check_collection(elasticsearch_client, ELASTICSEARCH_INDEX, collection)
 
     with open(stage_file, encoding='UTF-8') as yaml_file:
         stages_data = yaml.safe_load(yaml_file)
@@ -144,7 +161,8 @@ def log_parser_command(context, log_file, stage_file):
                 block.sort()
 
                 elasticsearch_client.index(
-                    index=elasticsearch_index, document=_process_block(block, stages_data['block'], delta_time)
+                    index=ELASTICSEARCH_INDEX,
+                    document=_process_block(block, collection, stages_data['block'], delta_time),
                 )
                 block = []
             elif block:
@@ -154,9 +172,14 @@ def log_parser_command(context, log_file, stage_file):
                 match = re.match(value_pattern['pattern'], log_line.line)
                 if match:
                     elasticsearch_client.index(
-                        index=elasticsearch_index, document=_process_value(
-                            value_pattern['id'], locate(value_pattern['type'])(match.group(1)), log_line, delta_time
-                            )
+                        index=ELASTICSEARCH_INDEX,
+                        document=_process_value(
+                            value_pattern['id'],
+                            collection,
+                            locate(value_pattern['type'])(match.group(1)),
+                            log_line,
+                            delta_time,
+                        ),
                     )
 
         except AttributeError:

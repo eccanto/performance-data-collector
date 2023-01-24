@@ -62,7 +62,7 @@ python3 -m pip install -r requirements.txt
 
 ```bash
 cd data_collectors/
-python3 main.py --elasticsearch_index "performance-data" --elasticsearch_url "http://admin:admin@localhost:9200" processes_data --interval "0.25" --process "htop"
+python3 main.py --collection "<EXECUTION_ID>" --elasticsearch_url "http://admin:admin@localhost:9200" processes_data --interval "0.25" --process "htop"
 ```
 
 ### Run log file data collector
@@ -78,7 +78,7 @@ python3 commands/log_parser/test/log_generator.py
 
 ```bash
 cd data_collectors/
-python3 main.py --elasticsearch_index "log-data" --elasticsearch_url "http://admin:admin@localhost:9200" log_parser --log_file "example.log" --stage_file "commands/log_parser/test/stages.yml"
+python3 main.py --collection "<EXECUTION_ID>" --elasticsearch_url "http://admin:admin@localhost:9200" log_parser --log_file "example.log" --stage_file "commands/log_parser/test/stages.yml"
 ```
 
 # Static code analysis tools

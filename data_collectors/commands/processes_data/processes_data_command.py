@@ -14,9 +14,13 @@ import coloredlogs
 import psutil
 from elasticsearch.helpers import bulk
 
+from commands.common import _check_collection
+
 
 _DEFAULT_INTERVAL = 0.25
 _SAMPLE_SIZE = 20
+
+ELASTICSEARCH_INDEX = 'performance-data'
 
 
 def _get_psutil_processes(process_names):
@@ -133,7 +137,7 @@ def processes_data_command(context, interval, processes, commands):
     Command example:
         '{ "name": "xml_files", "command": "ls -l ~ | wc -l", "type": "int" }'
 
-    :param contenxt: The Context object created by the click module which holds state for this particular invocation.
+    :param context: The Context object created by the click module which holds state for this particular invocation.
     """
     coloredlogs.install(
         fmt='%(asctime)s,%(msecs)03d %(hostname)s %(name)s[%(process)d] %(levelname)s %(message)s', level='INFO'
@@ -141,9 +145,11 @@ def processes_data_command(context, interval, processes, commands):
 
     logging.info('getting data: %s... (press Ctrl+C to stop)', processes)
 
-    elasticsearch_index = context.obj['elasticsearch_index']
+    collection = context.obj['collection']
     elasticsearch_client = context.obj['elasticsearch_client']
     delta_time = context.obj['delta_time']
+
+    _check_collection(elasticsearch_client, ELASTICSEARCH_INDEX, collection)
 
     commands = [json.loads(command) for command in commands]
 
@@ -151,6 +157,7 @@ def processes_data_command(context, interval, processes, commands):
     try:
         for iteration in itertools.count(1):
             iteration_data = defaultdict(lambda: defaultdict(lambda: {}))
+            iteration_data['collection'] = collection
 
             now = datetime.utcnow()
             iteration_data['@timestamp'] = (now + timedelta(hours=delta_time)).isoformat()
@@ -166,7 +173,7 @@ def processes_data_command(context, interval, processes, commands):
 
             if iteration % _SAMPLE_SIZE == 0:
                 bulk(
-                    elasticsearch_client, [{'_index': elasticsearch_index, '_source': item_data} for item_data in data]
+                    elasticsearch_client, [{'_index': ELASTICSEARCH_INDEX, '_source': item_data} for item_data in data]
                 )
                 data = []
 
@@ -175,4 +182,4 @@ def processes_data_command(context, interval, processes, commands):
         logging.info('stopping collection...')
 
         if data:
-            bulk(elasticsearch_client, [{'_index': elasticsearch_index, '_source': item_data} for item_data in data])
+            bulk(elasticsearch_client, [{'_index': ELASTICSEARCH_INDEX, '_source': item_data} for item_data in data])

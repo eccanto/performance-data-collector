@@ -16,7 +16,7 @@ _DEFAULT_DELTA_TIME = 0
 
 
 @click.group(help='Command Line Interface tool to manage automated test cycles of the project in Jira.')
-@click.option('-x', '--elasticsearch_index', help='Elasticsearch index.', required=True)
+@click.option('-c', '--collection', help='Collection name.', required=True)
 @click.option('-e', '--elasticsearch_url', help='Elasticsearch URL.', required=True)
 @click.option(
     '-d',
@@ -26,7 +26,7 @@ _DEFAULT_DELTA_TIME = 0
     type=int,
 )
 @click.pass_context
-def main(context, elasticsearch_index, elasticsearch_url, delta_time):
+def main(context, collection, elasticsearch_url, delta_time):
     """Main command line interface function composed of subcommands, takes general arguments to pass to subcommands."""
     coloredlogs.install(fmt='%(asctime)s-%(name)s-%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -34,7 +34,7 @@ def main(context, elasticsearch_index, elasticsearch_url, delta_time):
 
     elasticsearch_client = Elasticsearch(elasticsearch_url, verify_certs=False)
 
-    context.obj['elasticsearch_index'] = elasticsearch_index
+    context.obj['collection'] = collection
     context.obj['elasticsearch_client'] = elasticsearch_client
     context.obj['delta_time'] = delta_time
 
